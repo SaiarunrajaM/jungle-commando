@@ -83,6 +83,7 @@
   .life-dot.lost{background:transparent;border:1px solid var(--line);box-shadow:none;}
   #weaponTag{color:var(--text-lo);}
   #bestTag{color:var(--text-lo);}
+  #stageTag{color:var(--amber);}
   .iconbtn{
     font-family:'Press Start 2P',monospace;font-size:9px;color:var(--text-lo);
     background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
@@ -229,7 +230,7 @@
   <div class="masthead">
     <div class="eyebrow">BROWSER OPS // RUN &amp; GUN — V2</div>
     <div class="title">JUNGLE COMMANDO</div>
-    <div class="subtitle">A Contra-style run-and-gun for PC and mobile: three switchable weapons, armored and airborne enemies, a two-phase boss, synthesized gunfire and jungle ambience, screen shake, muzzle flashes and dynamic lighting — built entirely with Canvas and Web Audio, no plugins.</div>
+    <div class="subtitle">A Contra-style run-and-gun for PC and mobile: 5 sectors from riverbank to enemy stronghold, three switchable weapons, armored and airborne enemies, a two-phase boss, synthesized gunfire and ambience, screen shake and dynamic lighting — built entirely with Canvas and Web Audio, no plugins.</div>
   </div>
 
   <div class="rotate-tip" id="rotateTip" hidden>
@@ -242,6 +243,7 @@
       <div class="hud-group">
         <span><span class="hud-label">SCORE</span> <span id="scoreTag">000000</span></span>
         <span><span class="hud-label">BEST</span> <span id="bestTag">000000</span></span>
+        <span id="stageTag">SECTOR 1/5</span>
       </div>
       <div class="hud-group">
         <span class="hud-label">LIVES</span>
@@ -262,7 +264,7 @@
 
       <div class="overlay" id="overlayStart">
         <h2>JUNGLE COMMANDO</h2>
-        <p>Fight through enemy territory, collect weapon upgrades, and destroy the perimeter guardian at the end of the line.</p>
+        <p>Push through 5 sectors — riverbank, swamp, supply depot, a night assault and the enemy stronghold — collecting weapon upgrades before facing the perimeter guardian.</p>
         <div class="controls-hint">
           <span><kbd>&larr;</kbd><kbd>&rarr;</kbd> move</span>
           <span><kbd>&uarr;</kbd> aim up</span>
@@ -284,6 +286,12 @@
         <h2>PAUSED</h2>
         <p>Take a breath, commando.</p>
         <button class="start-btn" id="resumeBtn" type="button">RESUME</button>
+      </div>
+
+      <div class="overlay" id="overlayStageClear" hidden>
+        <h2>SECTOR <span id="stageClearNum">1</span> CLEAR</h2>
+        <p id="stageClearName" style="color:var(--amber);"></p>
+        <p class="stat">+<span id="stageClearBonus">0</span> BONUS</p>
       </div>
 
       <div class="overlay" id="overlayOver" hidden>
@@ -373,7 +381,7 @@
 
   var VIEW_W = 960, VIEW_H = 540;
   var GROUND_Y = 470;
-  var LEVEL_WIDTH = 8300;
+  var LEVEL_WIDTH = 1700;
   var GRAVITY = 0.55, MAX_FALL = 15, JUMP_V = -12.6, MOVE_SPEED = 3.7;
 
   var COLORS = {
@@ -392,7 +400,8 @@
     bunker:'#b8a678', bunkerDark:'#8f7c52',
     treeCanopyA:'#1f3a18', treeCanopyB:'#2c4d22', treeTrunk:'#3b2a1a', treeTrunkFar:'#241a10',
     rock:'#5a6058', rockDark:'#383d35',
-    plank:'#6b4a2a', plankDark:'#4a3018', plankEdge:'#8a6238'
+    plank:'#6b4a2a', plankDark:'#4a3018', plankEdge:'#8a6238',
+    fog:'rgba(10,25,10,.35)', grass:'rgba(90,170,60,.55)'
   };
 
   var WEAPON_META = {
@@ -418,29 +427,72 @@
     try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
   }
 
-  // ---------- level data ----------
-  var platforms = [];
-  (function(){
-    var xs=[520,900,1400,1900,2400,2900,3400,3900,4400,4900,5400,5900,6400,6900,7400,7800];
-    var ys=[360,300,380,320];
-    var ws=[180,140,200,160];
-    xs.forEach(function(x,i){ platforms.push({x:x,y:ys[i%4],w:ws[i%4],h:18}); });
-  })();
-
-  var enemySpawnDefs = [
-    {x:480,type:'walker'},{x:760,type:'turret'},{x:1040,type:'walker'},{x:1320,type:'drone'},
-    {x:1600,type:'walker'},{x:1880,type:'heavy'},{x:2160,type:'turret'},{x:2440,type:'walker'},
-    {x:2720,type:'walker'},{x:2960,type:'drone'},{x:3240,type:'turret'},{x:3520,type:'walker'},
-    {x:3800,type:'heavy'},{x:4080,type:'walker'},{x:4360,type:'turret'},{x:4640,type:'drone'},
-    {x:4920,type:'walker'},{x:5200,type:'walker'},{x:5480,type:'heavy'},{x:5760,type:'turret'},
-    {x:6040,type:'walker'},{x:6320,type:'drone'},{x:6600,type:'walker'},{x:6880,type:'turret'},
-    {x:7160,type:'heavy'},{x:7440,type:'walker'},{x:7700,type:'walker'}
+  // ---------- stage data ----------
+  function platformSet(xs,ys,ws){
+    return xs.map(function(x,i){ return {x:x,y:ys[i%ys.length],w:ws[i%ws.length],h:18}; });
+  }
+  var STAGES = [
+    {
+      name:'SECTOR 1 — RIVERBANK',
+      width:1700,
+      theme:{ sky1:'#12241a', sky2:'#050a06', hillFar:'rgba(20,45,25,.85)', hill1:'rgba(26,55,28,.9)', hill2:'rgba(18,40,20,.9)',
+        ground:'#12220f', groundTop:'#1c3417', fog:'rgba(10,25,10,.35)', grass:'rgba(90,170,60,.55)',
+        treeA:'#1f3a18', treeB:'#2c4d22' },
+      platforms: platformSet([300,650,1000,1350],[360,320,380,340],[160,140,160,140]),
+      enemies: [{x:400,type:'walker'},{x:700,type:'turret'},{x:1000,type:'walker'},{x:1300,type:'walker'},{x:1550,type:'turret'}],
+      powerups: [{x:500,type:'spread'}],
+      hasBoss:false
+    },
+    {
+      name:'SECTOR 2 — SWAMP DEPTHS',
+      width:1900,
+      theme:{ sky1:'#0c1a18', sky2:'#030806', hillFar:'rgba(12,35,32,.85)', hill1:'rgba(16,45,40,.9)', hill2:'rgba(10,30,28,.9)',
+        ground:'#10201c', groundTop:'#1a3630', fog:'rgba(8,35,30,.5)', grass:'rgba(60,150,120,.5)',
+        treeA:'#183a30', treeB:'#204a3c' },
+      platforms: platformSet([280,620,980,1340,1680],[340,300,380,320,360],[160,140,180,150,160]),
+      enemies: [{x:300,type:'walker'},{x:550,type:'drone'},{x:800,type:'heavy'},{x:1050,type:'turret'},
+        {x:1300,type:'walker'},{x:1550,type:'drone'},{x:1750,type:'heavy'}],
+      powerups: [{x:450,type:'laser'},{x:1400,type:'spread'}],
+      hasBoss:false
+    },
+    {
+      name:'SECTOR 3 — SUPPLY DEPOT',
+      width:2000,
+      theme:{ sky1:'#241a10', sky2:'#0a0603', hillFar:'rgba(40,30,18,.85)', hill1:'rgba(50,36,20,.9)', hill2:'rgba(34,26,16,.9)',
+        ground:'#221c14', groundTop:'#3a2f1c', fog:'rgba(40,25,10,.3)', grass:'rgba(150,120,60,.4)',
+        treeA:'#3a2f18', treeB:'#4a3a20' },
+      platforms: platformSet([260,600,940,1280,1620,1900],[320,360,300,380,340,300],[150,170,140,160,150,140]),
+      enemies: [{x:280,type:'walker'},{x:520,type:'turret'},{x:760,type:'drone'},{x:1000,type:'heavy'},
+        {x:1240,type:'walker'},{x:1480,type:'turret'},{x:1650,type:'drone'},{x:1820,type:'heavy'},{x:1950,type:'walker'}],
+      powerups: [{x:400,type:'spread'},{x:1200,type:'rocket'},{x:1800,type:'laser'}],
+      hasBoss:false
+    },
+    {
+      name:'SECTOR 4 — NIGHT ASSAULT',
+      width:2100,
+      theme:{ sky1:'#0a0e1c', sky2:'#020308', hillFar:'rgba(20,24,45,.85)', hill1:'rgba(26,30,55,.9)', hill2:'rgba(16,20,38,.9)',
+        ground:'#12161f', groundTop:'#1c2438', fog:'rgba(20,25,50,.4)', grass:'rgba(80,100,160,.45)',
+        treeA:'#182238', treeB:'#202e48' },
+      platforms: platformSet([260,560,880,1200,1520,1840],[360,300,380,320,360,300],[150,160,140,170,150,160]),
+      enemies: [{x:260,type:'turret'},{x:480,type:'walker'},{x:700,type:'drone'},{x:920,type:'heavy'},
+        {x:1140,type:'turret'},{x:1360,type:'walker'},{x:1560,type:'drone'},{x:1760,type:'heavy'},
+        {x:1940,type:'turret'},{x:2050,type:'walker'}],
+      powerups: [{x:500,type:'rocket'},{x:1500,type:'laser'}],
+      hasBoss:false
+    },
+    {
+      name:'SECTOR 5 — ENEMY STRONGHOLD',
+      width:1600,
+      theme:{ sky1:'#1a0a0a', sky2:'#060202', hillFar:'rgba(45,15,15,.85)', hill1:'rgba(55,20,20,.9)', hill2:'rgba(35,12,12,.9)',
+        ground:'#201010', groundTop:'#3a1818', fog:'rgba(50,10,10,.35)', grass:'rgba(150,60,50,.4)',
+        treeA:'#3a1414', treeB:'#4a1c1c' },
+      platforms: platformSet([260,560,880,1200],[340,300,360,320],[150,140,160,150]),
+      enemies: [{x:280,type:'walker'},{x:520,type:'turret'},{x:760,type:'heavy'},{x:1000,type:'drone'},
+        {x:1220,type:'walker'},{x:1360,type:'turret'}],
+      powerups: [{x:400,type:'spread'},{x:900,type:'rocket'}],
+      hasBoss:true
+    }
   ];
-  var powerupSpawnDefs = [
-    {x:700,type:'spread'},{x:1900,type:'laser'},{x:3100,type:'spread'},{x:4300,type:'rocket'},
-    {x:5500,type:'laser'},{x:6700,type:'spread'},{x:7550,type:'rocket'}
-  ];
-  var BOSS_X = 8020;
 
   // ---------- input ----------
   var keys = {left:false,right:false,up:false,shoot:false,jump:false};
@@ -632,18 +684,23 @@
   }
 
   // ---------- game state ----------
-  var player, bullets, enemies, powerups, particles, camera, boss, state, frame, shake;
+  var player, bullets, enemies, powerups, particles, camera, boss, state, frame, shake, platforms;
 
-  function resetGame(){
-    player = {
-      x:60,y:GROUND_Y-40,w:26,h:40,vx:0,vy:0,onGround:false,facing:1,
-      weapon:'normal', invincible:0, shootCooldown:0, walkPhase:0, muzzleTimer:0
-    };
-    bullets = [];
-    particles = [];
-    shake = {x:0,y:0,power:0,timer:0};
-    powerups = powerupSpawnDefs.map(function(d){ return {x:d.x,y:GROUND_Y-18,w:18,h:18,type:d.type,taken:false}; });
-    enemies = enemySpawnDefs.map(function(d){
+  function applyTheme(theme){
+    COLORS.sky1=theme.sky1; COLORS.sky2=theme.sky2;
+    COLORS.hillFar=theme.hillFar; COLORS.hill1=theme.hill1; COLORS.hill2=theme.hill2;
+    COLORS.ground=theme.ground; COLORS.groundTop=theme.groundTop;
+    COLORS.fog=theme.fog; COLORS.grass=theme.grass;
+    COLORS.treeCanopyA=theme.treeA; COLORS.treeCanopyB=theme.treeB;
+  }
+
+  function loadStage(n){
+    var st = STAGES[n-1];
+    LEVEL_WIDTH = st.width;
+    applyTheme(st.theme);
+    platforms = st.platforms.map(function(p){ return {x:p.x,y:p.y,w:p.w,h:p.h}; });
+    powerups = st.powerups.map(function(d){ return {x:d.x,y:GROUND_Y-18,w:18,h:18,type:d.type,taken:false}; });
+    enemies = st.enemies.map(function(d){
       var isTurret=d.type==='turret', isHeavy=d.type==='heavy', isDrone=d.type==='drone';
       var hp = isTurret?4:isHeavy?8:isDrone?2:3;
       var w = isHeavy?34:isDrone?26:isTurret?26:24;
@@ -657,14 +714,50 @@
         phase: Math.random()*Math.PI*2
       };
     });
-    boss = {
-      x:BOSS_X, y:GROUND_Y-70, w:56, h:70, hp:32, maxHp:32,
-      dir:1, baseX:BOSS_X, range:70, shootCd:100, alive:true, awake:false,
-      phase:1, flashTimer:0, attackCount:0
-    };
+    if(st.hasBoss){
+      var bx = st.width-260;
+      boss = {
+        x:bx, y:GROUND_Y-70, w:56, h:70, hp:32, maxHp:32,
+        dir:1, baseX:bx, range:70, shootCd:100, alive:true, awake:false,
+        phase:1, flashTimer:0, attackCount:0
+      };
+    } else {
+      boss = null;
+    }
+    bullets = [];
+    particles = [];
     camera = {x:0};
-    state = {score:0, lives:12, best:loadBest(), status:'start'};
+    player.x = 60; player.y = GROUND_Y-40; player.vx=0; player.vy=0; player.onGround=false;
+    document.getElementById('bossBar').hidden=true;
+    document.getElementById('bossLabel').hidden=true;
+    document.getElementById('stageTag').textContent = 'SECTOR '+n+'/5';
+  }
+
+  function advanceStage(){
+    state.status='stageclear';
+    var bonus=500;
+    state.score+=bonus; updateHud();
+    document.getElementById('stageClearNum').textContent=state.stage;
+    document.getElementById('stageClearName').textContent=STAGES[state.stage-1].name;
+    document.getElementById('stageClearBonus').textContent=bonus;
+    document.getElementById('overlayStageClear').hidden=false;
+    setTimeout(function(){
+      document.getElementById('overlayStageClear').hidden=true;
+      state.stage++;
+      loadStage(state.stage);
+      state.status='playing';
+    }, 1800);
+  }
+
+  function resetGame(){
+    player = {
+      x:60,y:GROUND_Y-40,w:26,h:40,vx:0,vy:0,onGround:false,facing:1,
+      weapon:'normal', invincible:0, shootCooldown:0, walkPhase:0, muzzleTimer:0
+    };
+    shake = {x:0,y:0,power:0,timer:0};
+    state = {score:0, lives:12, best:loadBest(), status:'start', stage:1};
     frame = 0;
+    loadStage(1);
     updateHud();
   }
 
@@ -772,7 +865,7 @@
     playWin();
   }
   function damageBoss(dmg){
-    if(!boss.alive) return;
+    if(!boss || !boss.alive) return;
     boss.hp-=dmg; boss.flashTimer=6;
     spawnParticles(boss.x+boss.w/2,boss.y+20,COLORS.boss,6);
     if(boss.phase===1 && boss.hp<=boss.maxHp*0.5){
@@ -797,7 +890,7 @@
         if(d<radius) damageEnemy(en,dmg,x,y);
       }
     });
-    if(boss.alive && boss.awake){
+    if(boss && boss.alive && boss.awake){
       var db=Math.hypot((boss.x+boss.w/2)-x,(boss.y+boss.h/2)-y);
       if(db<radius) damageBoss(dmg);
     }
@@ -931,7 +1024,7 @@
     });
 
     // --- boss ---
-    if(boss.alive){
+    if(boss && boss.alive){
       var distToBoss = boss.x-camera.x;
       if(distToBoss < VIEW_W+200) boss.awake=true;
       if(boss.flashTimer>0) boss.flashTimer-=dt;
@@ -972,7 +1065,7 @@
             var eR=enemies[ei];
             if(eR.alive && rectsOverlap(br,{x:eR.x,y:eR.y,w:eR.w,h:eR.h})) exploded=true;
           }
-          if(!exploded && boss.alive && boss.awake && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})) exploded=true;
+          if(!exploded && boss && boss.alive && boss.awake && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})) exploded=true;
           if(!exploded && bl.y+bl.r>=GROUND_Y) exploded=true;
           if(exploded){ explodeAt(bl.x,bl.y,64,bl.dmg); bullets.splice(bj,1); }
         } else if(bl.weapon==='laser'){
@@ -981,7 +1074,7 @@
               bl.hitSet.add(en); damageEnemy(en,bl.dmg,bl.x,bl.y); bl.pierce--;
             }
           });
-          if(boss.alive && boss.awake && !bl.hitSet.has(boss) && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){
+          if(boss && boss.alive && boss.awake && !bl.hitSet.has(boss) && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){
             bl.hitSet.add(boss); damageBoss(bl.dmg); bl.pierce--;
           }
           if(bl.pierce<=0) bullets.splice(bj,1);
@@ -991,7 +1084,7 @@
             var en2=enemies[ei2];
             if(en2.alive && rectsOverlap(br,{x:en2.x,y:en2.y,w:en2.w,h:en2.h})){ hit=true; damageEnemy(en2,bl.dmg,bl.x,bl.y); }
           }
-          if(!hit && boss.alive && boss.awake && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){ hit=true; damageBoss(bl.dmg); }
+          if(!hit && boss && boss.alive && boss.awake && rectsOverlap(br,{x:boss.x,y:boss.y,w:boss.w,h:boss.h})){ hit=true; damageBoss(bl.dmg); }
           if(hit) bullets.splice(bj,1);
         }
       } else {
@@ -1024,11 +1117,16 @@
     if(targetCam>LEVEL_WIDTH-VIEW_W) targetCam=LEVEL_WIDTH-VIEW_W;
     camera.x += (targetCam-camera.x)*0.12*dt;
 
-    var bossVisible = boss.alive && boss.awake;
+    var bossVisible = !!(boss && boss.alive && boss.awake);
     document.getElementById('bossBar').hidden = !bossVisible;
     document.getElementById('bossLabel').hidden = !bossVisible;
     if(bossVisible){
       document.getElementById('bossBarFill').style.width = Math.max(0,(boss.hp/boss.maxHp*100))+'%';
+    }
+
+    // --- stage exit ---
+    if(!STAGES[state.stage-1].hasBoss && player.x >= LEVEL_WIDTH - player.w - 6){
+      advanceStage();
     }
   }
 
@@ -1242,7 +1340,7 @@
   }
 
   function drawBoss(){
-    if(!boss.alive || !boss.awake) return;
+    if(!boss || !boss.alive || !boss.awake) return;
     var sx = boss.x-camera.x, w=boss.w, h=boss.h;
     var flashed = boss.flashTimer>0;
     var uni = flashed?'#ffffff':(boss.phase===2?COLORS.bossEnraged:COLORS.boss);
@@ -1404,7 +1502,7 @@
     drawTrees(0.65, COLORS.treeCanopyB, COLORS.treeTrunk, 400, 6, 260, 400);
 
     var fog=ctx.createLinearGradient(0,GROUND_Y-80,0,GROUND_Y);
-    fog.addColorStop(0,'rgba(10,20,10,0)'); fog.addColorStop(1,'rgba(10,25,10,.35)');
+    fog.addColorStop(0,'rgba(0,0,0,0)'); fog.addColorStop(1,COLORS.fog);
     ctx.fillStyle=fog; ctx.fillRect(0,GROUND_Y-80,VIEW_W,80);
 
     ctx.fillStyle=COLORS.ground;
@@ -1415,7 +1513,7 @@
     for(var gt=0;gt<40;gt++){
       var gx=(gt*47 - camera.x*0.8)%(VIEW_W+94);
       if(gx<-20) gx+=VIEW_W+94;
-      ctx.strokeStyle='rgba(90,170,60,.55)';
+      ctx.strokeStyle=COLORS.grass;
       ctx.lineWidth=1.5;
       ctx.beginPath();
       ctx.moveTo(gx-3, GROUND_Y+4); ctx.lineTo(gx-1, GROUND_Y-3);
