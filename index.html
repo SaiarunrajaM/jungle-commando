@@ -78,8 +78,8 @@
   }
   .hud-group{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .hud-label{color:var(--text-lo);}
-  .lives{display:flex;gap:5px;}
-  .life-dot{width:10px;height:10px;border-radius:2px;background:var(--neon);box-shadow:0 0 6px rgba(124,255,63,.6);}
+  .lives{display:flex;flex-wrap:wrap;gap:4px;max-width:120px;}
+  .life-dot{width:8px;height:8px;border-radius:2px;background:var(--neon);box-shadow:0 0 6px rgba(124,255,63,.6);}
   .life-dot.lost{background:transparent;border:1px solid var(--line);box-shadow:none;}
   #weaponTag{color:var(--text-lo);}
   #bestTag{color:var(--text-lo);}
@@ -663,7 +663,7 @@
       phase:1, flashTimer:0, attackCount:0
     };
     camera = {x:0};
-    state = {score:0, lives:3, best:loadBest(), status:'start'};
+    state = {score:0, lives:12, best:loadBest(), status:'start'};
     frame = 0;
     updateHud();
   }
@@ -676,7 +676,7 @@
     wtag.style.color = player.weapon==='spread'?'#ffb020':player.weapon==='laser'?'#5bd8ff':player.weapon==='rocket'?'#ff5a3d':'#8aa37c';
     var row = document.getElementById('livesRow');
     row.innerHTML='';
-    for(var i=0;i<3;i++){
+    for(var i=0;i<12;i++){
       var d = document.createElement('span');
       d.className = 'life-dot' + (i<state.lives?'':' lost');
       row.appendChild(d);
